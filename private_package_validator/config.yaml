@@ -1,0 +1,17 @@
+name: EJB Private Package Validator
+version: "1.0.0"
+slug: private_package_validator
+description: Read-only private staging validation; never executes staged code
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: manual
+init: false
+map:
+  - type: share
+    read_only: true
+options:
+  sha256: ""
+schema:
+  sha256: str
