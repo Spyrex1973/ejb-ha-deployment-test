@@ -1,0 +1,14 @@
+name: EJB Disposable Rollback Probe
+version: "1.0.0"
+slug: rollback_probe
+description: Isolated rollback acceptance fixture
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: manual
+init: false
+options:
+  marker: baseline
+schema:
+  marker: str
