@@ -1,0 +1,21 @@
+name: EJB Restricted Deployment Manager
+version: "0.2.8"
+slug: restricted_manager
+description: Runs privately staged verified manager with activation disabled
+arch: [amd64, aarch64]
+startup: application
+boot: manual
+init: false
+map:
+  - type: share
+    read_only: false
+options:
+  sha256: ""
+  interval_seconds: 30
+  enable_transfer: false
+  enable_probe_recovery: false
+schema:
+  sha256: str
+  interval_seconds: int(10,300)
+  enable_transfer: bool
+  enable_probe_recovery: bool
