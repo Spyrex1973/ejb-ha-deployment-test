@@ -31,5 +31,16 @@ req=urllib.request.Request('http://supervisor/core/api/',headers={'Authorization
 with urllib.request.urlopen(req,timeout=10) as response:
     if response.status!=200: raise SystemExit('Core API authentication failed')
 print('Authenticated Core API GET passed',flush=True)
+# Fixed read-only Supervisor metadata probe.
+for endpoint, label in [('/addons/d255f66c_rollback_probe/info','probe'),('/backups/ad107ff0/info','backup')]:
+    req=urllib.request.Request('http://supervisor'+endpoint,headers={'Authorization':'Bearer '+token})
+    with urllib.request.urlopen(req,timeout=15) as response:
+        data=json.load(response)
+    if data.get('result')!='ok': raise SystemExit('Supervisor metadata rejected')
+    d=data['data']
+    if label=='probe':
+        print('Supervisor probe metadata: '+json.dumps({k:d.get(k) for k in ('slug','version','state')}),flush=True)
+    else:
+        print('Supervisor backup metadata: '+json.dumps({k:d.get(k) for k in ('slug','type','addons','folders','homeassistant','protected')}),flush=True)
 os.chdir(dest)
 os.execve(sys.executable,[sys.executable,'-u',str(dest/'manager.py')],{k:v for k,v in os.environ.items() if k!='SUPERVISOR_TOKEN'})
