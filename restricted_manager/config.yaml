@@ -1,11 +1,12 @@
 name: EJB Restricted Deployment Manager
-version: "0.2.8"
+version: "0.2.9"
 slug: restricted_manager
 description: Runs privately staged verified manager with activation disabled
 arch: [amd64, aarch64]
 startup: application
 boot: manual
 init: false
+homeassistant_api: true
 map:
   - type: share
     read_only: false
