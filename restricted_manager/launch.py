@@ -1,3 +1,4 @@
+import urllib.request
 import base64, hashlib, io, json, pathlib, stat, zipfile, os, sys
 root=pathlib.Path('/share/ejb_music_reports/deployment_manager')
 opts=json.loads(pathlib.Path('/data/options.json').read_text())
@@ -23,5 +24,12 @@ with zipfile.ZipFile(io.BytesIO(b)) as z:
 # No source mount or API privileges. Only manager's status loop and stage validation are enabled.
 if opts.get('enable_transfer') is not False or opts.get('enable_probe_recovery') is not False: raise SystemExit('activation denied')
 print('Verified restricted manager package '+pin,flush=True)
+# Read-only authentication acceptance; never print token or response body.
+token=os.environ.get('SUPERVISOR_TOKEN','')
+if not token: raise SystemExit('API token absent')
+req=urllib.request.Request('http://supervisor/core/api/',headers={'Authorization':'Bearer '+token})
+with urllib.request.urlopen(req,timeout=10) as response:
+    if response.status!=200: raise SystemExit('Core API authentication failed')
+print('Authenticated Core API GET passed',flush=True)
 os.chdir(dest)
-os.execv(sys.executable,[sys.executable,'-u',str(dest/'manager.py')])
+os.execve(sys.executable,[sys.executable,'-u',str(dest/'manager.py')],{k:v for k,v in os.environ.items() if k!='SUPERVISOR_TOKEN'})
