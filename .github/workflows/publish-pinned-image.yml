@@ -1,22 +1,19 @@
 name: Publish pinned disposable image
 on:
-  workflow_dispatch:
-    inputs:
-      authorize_publication:
-        type: boolean
-        default: false
-        description: Authorize publication of disposable image only
+  push:
+    branches: [p5-pr-evidence]
+    paths: [.github/workflows/publish-pinned-image.yml]
 permissions:
   contents: read
   actions: read
 jobs:
   publish:
-    if: inputs.authorize_publication == true
     permissions:
       contents: read
       actions: read
       packages: write
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       digest: ${{ steps.push.outputs.digest }}
     steps:
@@ -50,6 +47,7 @@ jobs:
           docker logout ghcr.io
   verify:
     needs: publish
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - name: Independent anonymous digest pull

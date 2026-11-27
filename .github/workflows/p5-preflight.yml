@@ -1,11 +1,14 @@
 name: P5 read-only execution preflight
 on:
-  push:
+  pull_request:
     branches: [registry-distribution-validation]
-    paths: ['.github/workflows/p5-preflight.yml']
+  push:
+    branches: [p5-pr-evidence]
+    paths: [.github/workflows/p5-preflight.yml]
 permissions:
   contents: read
   actions: read
+  packages: read
 jobs:
   preflight:
     runs-on: ubuntu-latest
@@ -32,4 +35,54 @@ jobs:
             jq -r '.config.digest // "index or unknown"' manifest.json
           else
             echo "Anonymous visibility not established; publication remains blocked"
+          fi
+      - name: Pull and verify exact digest anonymously
+        run: |
+          set -eu
+          image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
+          digest=sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
+          expected_revision=b99512ca44139b73a0964ffc0e072243841cea74
+          export DOCKER_CONFIG="$(mktemp -d)"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          docker pull --platform linux/amd64 "$image@$digest"
+          actual_id="$(docker image inspect --format '{{.Id}}' "$image@$digest")"
+          actual_revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$digest")"
+          test "$actual_id" = "$digest"
+          test "$actual_revision" = "$expected_revision"
+          printf 'anonymous_pull=verified\nimage=%s\ndigest=%s\nimage_id=%s\nrevision=%s\n' "$image" "$digest" "$actual_id" "$actual_revision" | tee registry-verification.txt
+      - name: Preserve verification result
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry-anonymous-digest-verification
+          path: registry-verification.txt
+          retention-days: 90
+      - name: Inspect package metadata with scoped read token
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          endpoint='users/Spyrex1973/packages/container/ejb-ha-deployment-test%2Frollback-probe'
+          if gh api "$endpoint" > package.json; then
+            jq '{name,visibility,package_type,version_count}' package.json
+          else
+            echo "Package metadata unavailable; absence or visibility cannot be established"
+          fi
+      - name: Authenticated registry manifest lookup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          export DOCKER_CONFIG="$(mktemp -d)"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf "$DOCKER_CONFIG"' EXIT
+          image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
+          if printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin; then
+            echo "REGISTRY_LOGIN_OK"
+            if docker manifest inspect "$image:1.0.1" > authenticated-manifest.json; then
+              echo "AUTHENTICATED_MANIFEST_OK"
+              jq '{mediaType,config_digest:.config.digest,manifests:[.manifests[]? | {digest,platform}]}' authenticated-manifest.json
+            else
+              echo "AUTHENTICATED_MANIFEST_UNAVAILABLE"
+            fi
+          else
+            echo "REGISTRY_LOGIN_FAILED"
           fi
