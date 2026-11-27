@@ -1,0 +1,50 @@
+name: Registry candidate publication
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Exact approved source commit
+        required: true
+      publish:
+        description: Explicitly authorize registry publication
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    if: inputs.publish == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
+      - name: Validate source and build
+        env:
+          APPROVED_REVISION: ${{ inputs.revision }}
+        run: |
+          set -eu
+          test "$(git rev-parse HEAD)" = "$APPROVED_REVISION"
+          test "$APPROVED_REVISION" = "86925a5a61e35c3300f0bd376150c31b1c1db988"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/rollback-probe"
+          docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$APPROVED_REVISION" -t "$image:$APPROVED_REVISION" rollback_probe
+          docker image inspect --format '{{.Id}}' "$image:$APPROVED_REVISION" > image-id.txt
+      - name: Publish exact build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPROVED_REVISION: ${{ inputs.revision }}
+        run: |
+          set -eu
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/rollback-probe"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$image:$APPROVED_REVISION"
+          docker image inspect --format '{{json .RepoDigests}}' "$image:$APPROVED_REVISION" > registry-digests.json
+          docker logout ghcr.io
+      - uses: actions/upload-artifact@v4
+        with:
+          name: registry-image-evidence
+          path: |
+            image-id.txt
+            registry-digests.json
