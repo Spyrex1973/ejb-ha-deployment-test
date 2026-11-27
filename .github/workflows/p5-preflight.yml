@@ -5,6 +5,7 @@ on:
 permissions:
   contents: read
   actions: read
+  packages: read
 jobs:
   preflight:
     runs-on: ubuntu-latest
@@ -31,4 +32,15 @@ jobs:
             jq -r '.config.digest // "index or unknown"' manifest.json
           else
             echo "Anonymous visibility not established; publication remains blocked"
+          fi
+      - name: Inspect package metadata with scoped read token
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          endpoint='users/Spyrex1973/packages/container/ejb-ha-deployment-test%2Frollback-probe'
+          if gh api "$endpoint" > package.json; then
+            jq '{name,visibility,package_type,version_count}' package.json
+          else
+            echo "Package metadata unavailable; absence or visibility cannot be established"
           fi
