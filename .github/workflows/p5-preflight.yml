@@ -1,0 +1,35 @@
+name: P5 read-only execution preflight
+on:
+  push:
+    branches: [registry-distribution-validation]
+    paths: ['.github/workflows/p5-preflight.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Load and validate exact artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh api repos/Spyrex1973/ejb-ha-deployment-test/actions/artifacts/15179208147/zip > evidence.zip
+          echo 'ea5e3e690566ac2540053447a460b0ad494713fa15122c98031848c26e23af29  evidence.zip' | sha256sum -c -
+          unzip -q evidence.zip -d evidence
+          test "$(cat evidence/revision.txt)" = b99512ca44139b73a0964ffc0e072243841cea74
+          (cd evidence && sha256sum -c probe-image.sha256)
+          docker load -i evidence/probe-image.tar
+          test "$(docker image inspect --format '{{.Id}}' ejb-probe:1.0.1)" = sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
+      - name: Inspect anonymous registry access without publication
+        run: |
+          set -eu
+          image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
+          if docker manifest inspect "$image:1.0.1" > manifest.json; then
+            echo "Existing tag anonymously readable; no publication performed"
+            jq -r '.config.digest // "index or unknown"' manifest.json
+          else
+            echo "Anonymous visibility not established; publication remains blocked"
+          fi
