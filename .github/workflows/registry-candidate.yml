@@ -29,7 +29,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$APPROVED_REVISION"
           test "$APPROVED_REVISION" = "86925a5a61e35c3300f0bd376150c31b1c1db988"
           image="ghcr.io/${GITHUB_REPOSITORY,,}/rollback-probe"
-          docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$APPROVED_REVISION" -t "$image:$APPROVED_REVISION" rollback_probe
+          docker build --platform linux/amd64 --label "io.hass.version=1.0.1" --label "io.hass.arch=amd64" --label "io.hass.type=app" --label "org.opencontainers.image.revision=$APPROVED_REVISION" -t "$image:$APPROVED_REVISION" rollback_probe
           docker image inspect --format '{{.Id}}' "$image:$APPROVED_REVISION" > image-id.txt
       - name: Publish exact build
         env:
@@ -39,8 +39,9 @@ jobs:
           set -eu
           image="ghcr.io/${GITHUB_REPOSITORY,,}/rollback-probe"
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker push "$image:$APPROVED_REVISION"
-          docker image inspect --format '{{json .RepoDigests}}' "$image:$APPROVED_REVISION" > registry-digests.json
+          docker tag "$image:$APPROVED_REVISION" "$image:1.0.1"
+          docker push "$image:1.0.1"
+          docker image inspect --format '{{json .RepoDigests}}' "$image:1.0.1" > registry-digests.json
           docker logout ghcr.io
       - uses: actions/upload-artifact@v4
         with:
