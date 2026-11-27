@@ -1,51 +1,31 @@
 name: Registry candidate publication
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/registry-candidate.yml'
   workflow_dispatch:
-    inputs:
-      revision:
-        description: Exact approved source commit
-        required: true
-      publish:
-        description: Explicitly authorize registry publication
-        type: boolean
-        default: false
 permissions:
   contents: read
-  packages: write
+  actions: read
 jobs:
-  publish:
-    if: inputs.publish == true
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.revision }}
-          persist-credentials: false
-      - name: Validate source and build
+      - name: Download exact evidence artifact
         env:
-          APPROVED_REVISION: ${{ inputs.revision }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          test "$(git rev-parse HEAD)" = "$APPROVED_REVISION"
-          test "$APPROVED_REVISION" = "86925a5a61e35c3300f0bd376150c31b1c1db988"
-          image="ghcr.io/${GITHUB_REPOSITORY,,}/rollback-probe"
-          docker build --platform linux/amd64 --label "io.hass.version=1.0.1" --label "io.hass.arch=amd64" --label "io.hass.type=app" --label "org.opencontainers.image.revision=$APPROVED_REVISION" -t "$image:$APPROVED_REVISION" rollback_probe
-          docker image inspect --format '{{.Id}}' "$image:$APPROVED_REVISION" > image-id.txt
-      - name: Publish exact build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPROVED_REVISION: ${{ inputs.revision }}
-        run: |
-          set -eu
-          image="ghcr.io/${GITHUB_REPOSITORY,,}/rollback-probe"
-          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker tag "$image:$APPROVED_REVISION" "$image:1.0.1"
-          docker push "$image:1.0.1"
-          docker image inspect --format '{{json .RepoDigests}}' "$image:1.0.1" > registry-digests.json
-          docker logout ghcr.io
-      - uses: actions/upload-artifact@v4
-        with:
-          name: registry-image-evidence
-          path: |
-            image-id.txt
-            registry-digests.json
+          gh api repos/Spyrex1973/ejb-ha-deployment-test/actions/artifacts/15177222540/zip > evidence.zip
+          echo '762535ecf3c1b13754dea86df09b3d18b4b1d142bbf4fecc9a01ec6b15897a7e  evidence.zip' | sha256sum -c -
+          unzip -q evidence.zip -d evidence
+          cd evidence
+          test "$(cat revision.txt)" = 86925a5a61e35c3300f0bd376150c31b1c1db988
+          sha256sum -c probe-image.sha256
+          docker load -i probe-image.tar
+          test "$(docker image inspect --format '{{.Id}}' ejb-probe:1.0.1)" = "$(cat image-id.txt)"
+          test "$(cat image-id.txt)" = sha256:e52937c9eb3cbcd85b8fc7f8d706802e8cdebb410d1fd741f1d21ced39b9b755
+          docker tag ejb-probe:1.0.1 ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe:1.0.1
+          test "$(docker image inspect --format '{{.Id}}' ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe:1.0.1)" = "$(cat image-id.txt)"
+          docker image inspect --format '{{json .Config.Labels}}' ejb-probe:1.0.1
+          echo 'Validation only; publication disabled pending visibility, cost and label acceptance.'
