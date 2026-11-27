@@ -1,0 +1,12 @@
+{
+  "revision": "b99512ca44139b73a0964ffc0e072243841cea74",
+  "run_id": 45957544824,
+  "artifact_id": 15179208147,
+  "artifact_sha256": "ea5e3e690566ac2540053447a460b0ad494713fa15122c98031848c26e23af29",
+  "image_id": "sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf",
+  "config_digest": "sha256:a79b0e759b0207cd68101b741ffffc2ab4adf235d877e105b6de96f49d1eb2c2",
+  "manifest_digest": "sha256:aacad8097f65425ceebeac8139ca1f61100b09a59ce70a5713fe0e6b1caf3dde",
+  "target": "d255f66c_rollback_probe",
+  "version": "1.0.1",
+  "publication_authorized": false
+}
