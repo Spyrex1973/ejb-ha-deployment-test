@@ -3,29 +3,54 @@ on:
   pull_request:
     paths:
       - '.github/workflows/registry-candidate.yml'
-  workflow_dispatch:
+      - 'rollback_probe/**'
 permissions:
   contents: read
-  actions: read
 jobs:
-  validate:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Download exact evidence artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Build labeled candidate once
         run: |
           set -eu
-          gh api repos/Spyrex1973/ejb-ha-deployment-test/actions/artifacts/15177222540/zip > evidence.zip
-          echo '762535ecf3c1b13754dea86df09b3d18b4b1d142bbf4fecc9a01ec6b15897a7e  evidence.zip' | sha256sum -c -
-          unzip -q evidence.zip -d evidence
-          cd evidence
-          test "$(cat revision.txt)" = 86925a5a61e35c3300f0bd376150c31b1c1db988
+          revision=$(git rev-parse HEAD)
+          test "$revision" = "${{ github.event.pull_request.head.sha }}"
+          docker build --platform linux/amd64 --label "io.hass.version=1.0.1" --label "io.hass.arch=amd64" --label "io.hass.type=addon" --label "org.opencontainers.image.revision=$revision" -t ejb-probe:1.0.1 rollback_probe
+          docker image inspect --format '{{.Id}}' ejb-probe:1.0.1 | tee image-id.txt
+          printf '%s\n' "$revision" > revision.txt
+          docker save ejb-probe:1.0.1 -o probe-image.tar
+          sha256sum probe-image.tar > probe-image.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: labeled-candidate
+          path: |
+            image-id.txt
+            revision.txt
+            probe-image.tar
+            probe-image.sha256
+  validate:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: labeled-candidate
+      - name: Verify preserved image without rebuild
+        run: |
+          set -eu
           sha256sum -c probe-image.sha256
+          test "$(cat revision.txt)" = "${{ github.event.pull_request.head.sha }}"
           docker load -i probe-image.tar
-          test "$(docker image inspect --format '{{.Id}}' ejb-probe:1.0.1)" = "$(cat image-id.txt)"
-          test "$(cat image-id.txt)" = sha256:e52937c9eb3cbcd85b8fc7f8d706802e8cdebb410d1fd741f1d21ced39b9b755
+          docker image inspect --format '{{.Id}}' ejb-probe:1.0.1 | tee loaded-id.txt
+          diff -u image-id.txt loaded-id.txt
+          test "$(docker image inspect --format '{{index .Config.Labels "io.hass.version"}}' ejb-probe:1.0.1)" = 1.0.1
+          test "$(docker image inspect --format '{{index .Config.Labels "io.hass.arch"}}' ejb-probe:1.0.1)" = amd64
+          test "$(docker image inspect --format '{{index .Config.Labels "io.hass.type"}}' ejb-probe:1.0.1)" = addon
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' ejb-probe:1.0.1)" = "$(cat revision.txt)"
           docker tag ejb-probe:1.0.1 ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe:1.0.1
           test "$(docker image inspect --format '{{.Id}}' ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe:1.0.1)" = "$(cat image-id.txt)"
-          docker image inspect --format '{{json .Config.Labels}}' ejb-probe:1.0.1
-          echo 'Validation only; publication disabled pending visibility, cost and label acceptance.'
+          echo 'Verified without rebuilding; publication disabled.'
