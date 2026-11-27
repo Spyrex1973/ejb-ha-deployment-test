@@ -1,8 +1,7 @@
 name: P5 read-only execution preflight
 on:
-  push:
+  pull_request:
     branches: [registry-distribution-validation]
-    paths: ['.github/workflows/p5-preflight.yml']
 permissions:
   contents: read
   actions: read
