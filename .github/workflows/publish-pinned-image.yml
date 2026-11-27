@@ -43,7 +43,9 @@ jobs:
           docker tag ejb-probe:1.0.1 "$image:1.0.1"
           docker push "$image:1.0.1"
           digest=$(docker buildx imagetools inspect "$image:1.0.1" --format '{{json .Manifest}}' | jq -r .digest)
-          printf '%s\n' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}
+          printf '%s\n' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          docker buildx imagetools inspect "$image@$digest" --raw > manifest.json
+          test "$(jq -er '.config.digest' manifest.json)" = sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           docker logout ghcr.io
   verify:
@@ -55,68 +57,10 @@ jobs:
           DIGEST: ${{ needs.publish.outputs.digest }}
         run: |
           set -eu
-          printf '%s\n' "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}
+          printf '%s\n' "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
           image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
           docker pull --platform linux/amd64 "$image@$DIGEST"
           test "$(docker image inspect --format '{{.Id}}' "$image@$DIGEST")" = sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
-          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$DIGEST")" = b99512ca44139b73a0964ffc0e072243841cea74
-          echo "Anonymous digest pull verified: $image@$DIGEST" | tee registry-verification.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: registry-pull-verification
-          path: registry-verification.txt
-
-          docker buildx imagetools inspect "$image@$digest" --raw > manifest.json
-          test "$(jq -er '.config.digest' manifest.json)" = sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          docker logout ghcr.io
-  verify:
-    needs: publish
-    runs-on: ubuntu-latest
-    steps:
-      - name: Independent anonymous digest pull
-        env:
-          DIGEST: ${{ needs.publish.outputs.digest }}
-        run: |
-          set -eu
-          test "$DIGEST" = sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
-          image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
-          docker pull --platform linux/amd64 "$image@$DIGEST"
-          test "$(docker image inspect --format '{{.Id}}' "$image@$DIGEST")" = "$DIGEST"
-          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$DIGEST")" = b99512ca44139b73a0964ffc0e072243841cea74
-          echo "Anonymous digest pull verified: $image@$DIGEST" | tee registry-verification.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: registry-pull-verification
-          path: registry-verification.txt
-
-          image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
-          docker pull --platform linux/amd64 "$image@$DIGEST"
-          test "$(docker image inspect --format '{{.Id}}' "$image@$DIGEST")" = "$DIGEST"
-          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$DIGEST")" = b99512ca44139b73a0964ffc0e072243841cea74
-          echo "Anonymous digest pull verified: $image@$DIGEST" | tee registry-verification.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: registry-pull-verification
-          path: registry-verification.txt
-
-          docker buildx imagetools inspect "$image@$digest" --raw > manifest.json
-          test "$(jq -er '.config.digest' manifest.json)" = sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          docker logout ghcr.io
-  verify:
-    needs: publish
-    runs-on: ubuntu-latest
-    steps:
-      - name: Independent anonymous digest pull
-        env:
-          DIGEST: ${{ needs.publish.outputs.digest }}
-        run: |
-          set -eu
-          test "$DIGEST" = sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
-          image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
-          docker pull --platform linux/amd64 "$image@$DIGEST"
-          test "$(docker image inspect --format '{{.Id}}' "$image@$DIGEST")" = "$DIGEST"
           test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$DIGEST")" = b99512ca44139b73a0964ffc0e072243841cea74
           echo "Anonymous digest pull verified: $image@$DIGEST" | tee registry-verification.txt
       - uses: actions/upload-artifact@v4
