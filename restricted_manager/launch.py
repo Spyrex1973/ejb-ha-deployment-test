@@ -42,5 +42,21 @@ for endpoint, label in [('/addons/d255f66c_rollback_probe/info','probe'),('/back
         print('Supervisor probe metadata: '+json.dumps({k:d.get(k) for k in ('slug','version','state')}),flush=True)
     else:
         print('Supervisor backup metadata: '+json.dumps({k:d.get(k) for k in ('slug','type','addons','folders','homeassistant','protected')}),flush=True)
+# Fail closed: recovery remains disabled until broker acceptance.
+# Run the ordinary controller without privileged environment or inherited groups.
+import subprocess
 os.chdir(dest)
-os.execve(sys.executable,[sys.executable,'-u',str(dest/'manager.py')],{k:v for k,v in os.environ.items() if k!='SUPERVISOR_TOKEN'})
+if os.geteuid() != 0:
+    raise SystemExit('launcher requires root for privilege separation')
+# Candidate uses a dedicated non-root numeric identity; report permissions
+# must be validated in the installed container before release.
+for entry in dest.iterdir():
+    entry.chmod(0o444)
+dest.chmod(0o555)
+child = subprocess.Popen(
+    [sys.executable, '-u', str(dest/'manager.py')],
+    env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'},
+    user=65532, group=65532, extra_groups=[], close_fds=True,
+    umask=0o077)
+raise SystemExit(child.wait())
+
