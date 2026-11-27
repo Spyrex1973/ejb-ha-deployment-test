@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "target": "d255f66c_rollback_probe",
+  "registry": "ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe",
+  "version": "1.0.1",
+  "source_revision": "b99512ca44139b73a0964ffc0e072243841cea74",
+  "artifact_id": 15179208147,
+  "expected_digest": "sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf",
+  "retention": "indefinite",
+  "allow_delete": false,
+  "allow_overwrite": false,
+  "require_anonymous_digest_pull": true,
+  "require_independent_verification": true,
+  "publication_verified": false,
+  "retention_enforced": false
+}
