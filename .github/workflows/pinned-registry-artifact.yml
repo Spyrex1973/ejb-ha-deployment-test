@@ -1,0 +1,36 @@
+name: Pinned registry artifact
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pinned-registry-artifact.yml'
+      - 'registry-candidate-pin.json'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Load only pinned artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          pin=registry-candidate-pin.json
+          test "$(jq -r .publication_authorized "$pin")" = false
+          id=$(jq -r .artifact_id "$pin")
+          gh api "repos/Spyrex1973/ejb-ha-deployment-test/actions/artifacts/$id/zip" > evidence.zip
+          echo "$(jq -r .artifact_sha256 "$pin")  evidence.zip" | sha256sum -c -
+          mkdir evidence
+          unzip -q evidence.zip -d evidence
+          test "$(cat evidence/revision.txt)" = "$(jq -r .revision "$pin")"
+          test "$(cat evidence/image-id.txt)" = "$(jq -r .image_id "$pin")"
+          (cd evidence && sha256sum -c probe-image.sha256)
+          docker load -i evidence/probe-image.tar
+          test "$(docker image inspect --format '{{.Id}}' ejb-probe:1.0.1)" = "$(jq -r .image_id "$pin")"
+          docker tag ejb-probe:1.0.1 ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe:1.0.1
+          test "$(docker image inspect --format '{{.Id}}' ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe:1.0.1)" = "$(jq -r .image_id "$pin")"
+          echo 'Pinned artifact verified; no build or publication performed.'
