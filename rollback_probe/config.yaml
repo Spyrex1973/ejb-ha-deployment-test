@@ -4,7 +4,6 @@ slug: rollback_probe
 description: Isolated rollback acceptance fixture
 arch:
   - amd64
-  - aarch64
 startup: application
 boot: manual
 init: false
@@ -12,3 +11,6 @@ options:
   marker: baseline
 schema:
   marker: str
+image: "ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe"
+breaking_versions:
+  - "1.0.1"
