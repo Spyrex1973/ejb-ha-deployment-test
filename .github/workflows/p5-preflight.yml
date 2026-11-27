@@ -2,6 +2,9 @@ name: P5 read-only execution preflight
 on:
   pull_request:
     branches: [registry-distribution-validation]
+  push:
+    branches: [p5-pr-evidence]
+    paths: [.github/workflows/p5-preflight.yml]
 permissions:
   contents: read
   actions: read
@@ -33,6 +36,26 @@ jobs:
           else
             echo "Anonymous visibility not established; publication remains blocked"
           fi
+      - name: Pull and verify exact digest anonymously
+        run: |
+          set -eu
+          image=ghcr.io/spyrex1973/ejb-ha-deployment-test/rollback-probe
+          digest=sha256:1fe494f3672aa6f70938d1ec17298e5d5c8e375da50a9824b4693bfe46baa5bf
+          expected_revision=b99512ca44139b73a0964ffc0e072243841cea74
+          export DOCKER_CONFIG="$(mktemp -d)"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          docker pull --platform linux/amd64 "$image@$digest"
+          actual_id="$(docker image inspect --format '{{.Id}}' "$image@$digest")"
+          actual_revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$digest")"
+          test "$actual_id" = "$digest"
+          test "$actual_revision" = "$expected_revision"
+          printf 'anonymous_pull=verified\nimage=%s\ndigest=%s\nimage_id=%s\nrevision=%s\n' "$image" "$digest" "$actual_id" "$actual_revision" | tee registry-verification.txt
+      - name: Preserve verification result
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry-anonymous-digest-verification
+          path: registry-verification.txt
+          retention-days: 90
       - name: Inspect package metadata with scoped read token
         env:
           GH_TOKEN: ${{ github.token }}
