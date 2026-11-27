@@ -1,0 +1,36 @@
+name: Disposable image evidence
+on:
+  pull_request:
+    paths:
+      - 'rollback_probe/**'
+      - '.github/workflows/probe-image-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Build and verify exact revision
+        run: |
+          set -eu
+          revision=$(git rev-parse HEAD)
+          test "$revision" = "${{ github.event.pull_request.head.sha }}"
+          docker build --label "org.opencontainers.image.revision=$revision" -t ejb-probe:1.0.1 rollback_probe
+          docker image inspect ejb-probe:1.0.1 > image-inspect.json
+          docker image inspect --format '{{.Id}}' ejb-probe:1.0.1 > image-id.txt
+          printf '%s\n' "$revision" > revision.txt
+          docker save ejb-probe:1.0.1 -o probe-image.tar
+          sha256sum probe-image.tar > probe-image.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: disposable-image-evidence
+          path: |
+            image-inspect.json
+            image-id.txt
+            revision.txt
+            probe-image.tar
+            probe-image.sha256
