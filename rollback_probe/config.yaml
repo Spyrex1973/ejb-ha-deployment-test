@@ -1,5 +1,5 @@
 name: EJB Disposable Rollback Probe
-version: "1.0.0"
+version: "1.0.1"
 slug: rollback_probe
 description: Isolated rollback acceptance fixture
 arch:
