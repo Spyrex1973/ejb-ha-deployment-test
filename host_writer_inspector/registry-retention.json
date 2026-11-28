@@ -7,5 +7,7 @@
   "evidence_artifact": 15254416201,
   "retention_policy": "retain pinned version; do not delete or overwrite",
   "enforcement": "not verified",
-  "visibility": "not verified"
+  "visibility": "administrative setting unverified; anonymous pull verified",
+  "anonymous_verification_run": 46122826969,
+  "anonymous_retrieval": "verified"
 }
