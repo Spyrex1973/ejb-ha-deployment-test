@@ -1,8 +1,9 @@
 name: EJB Host Writer Inspector
-version: "0.1.1"
+version: "0.1.1-ci46122065139"
 slug: host_writer_inspector
 description: Restricted diagnostic candidate; no production writes
-arch: [amd64, aarch64]
+arch: [amd64]
+image: ghcr.io/spyrex1973/ejb-host-writer-inspector
 startup: application
 boot: manual
 init: false
