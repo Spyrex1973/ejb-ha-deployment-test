@@ -1,5 +1,5 @@
 name: EJB Host Writer Inspector
-version: "0.1.0"
+version: "0.1.1"
 slug: host_writer_inspector
 description: Restricted diagnostic candidate; no production writes
 arch: [amd64, aarch64]
@@ -10,3 +10,4 @@ host_pid: true
 map:
   - type: media
     read_only: true
+apparmor: true
