@@ -1,0 +1,22 @@
+#include <tunables/global>
+profile host_writer_inspector flags=(attach_disconnected,mediate_deleted) {
+  /usr/local/bin/python* ix,
+  /usr/local/lib/** mr,
+  /lib/** mr,
+  /opt/inspector.py r,
+  /etc/ld.so.cache r,
+  /dev/null rw,
+  /dev/urandom r,
+  /proc/ r,
+  /proc/[0-9]*/status r,
+  /proc/[0-9]*/mountinfo r,
+  /proc/self/status r,
+  /proc/self/mountinfo r,
+  deny /proc/**/root{,/**} rwklmx,
+  deny /proc/**/fd{,/**} rwklmx,
+  deny /proc/**/mem rwklmx,
+  deny signal (send),
+  deny ptrace (trace,read),
+  deny capability,
+  deny network,
+}
