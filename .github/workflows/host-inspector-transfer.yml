@@ -6,6 +6,7 @@ on:
 permissions:
   actions: read
   contents: read
+  packages: write
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -18,8 +19,8 @@ jobs:
           gh api repos/${{ github.repository }}/actions/artifacts/15254370061/zip > artifact.zip
           echo 'b3a05b299b75126ed3a704b42d8694d6e407be200ede70e4b57d7edd006ab5c9  artifact.zip' | sha256sum -c -
           unzip -q artifact.zip -d evidence
+          sha256sum -c evidence/archive.sha256
           cd evidence
-          sha256sum -c archive.sha256
           gzip -dc inspector.tar.gz | docker load
           test "$(docker image inspect inspector-test --format '{{.Id}}')" = "$(cat image-id.txt)"
           python3 -c 'import json; r=json.load(open("host-security.json")); assert not r["signal_permission"] and not r["process_root_access"]'
