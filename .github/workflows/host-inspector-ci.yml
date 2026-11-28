@@ -16,4 +16,33 @@ jobs:
       - run: |
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges inspector-test > report.json
           python3 -c 'import json; r=json.load(open("report.json")); assert r["uid"]==65534 and r["complete"] is False'
-          docker image inspect inspector-test --format '{{.Id}}'
+      - name: Host PID security characterization
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p evidence
+          docker run -d --name inspector-fixture --user 65534:65534 --entrypoint sleep inspector-test 120
+          trap 'docker rm -f inspector-fixture >/dev/null' EXIT
+          pid=$(docker inspect -f '{{.State.Pid}}' inspector-fixture)
+          docker run --rm --pid host --network none --read-only --cap-drop ALL --security-opt no-new-privileges inspector-test > evidence/host-report.json
+          docker run --rm --pid host --network none --read-only --cap-drop ALL --security-opt no-new-privileges --entrypoint python inspector-test -c 'import os,json,sys; p=int(sys.argv[1]); r={"fixture_pid":p}; 
+          try: os.kill(p,0); r["signal_permission"]=True
+          except PermissionError: r["signal_permission"]=False
+          try: fd=os.open("/proc/%d/root"%p,os.O_PATH); os.close(fd); r["process_root_access"]=True
+          except OSError: r["process_root_access"]=False
+          print(json.dumps(r))' "$pid" > evidence/host-security.json
+          cat evidence/host-security.json
+          python3 -c 'import json; r=json.load(open("evidence/host-report.json")); assert r["uid"]==65534 and r["complete"] is False'
+      - name: Preserve exact tested candidate
+        run: |
+          docker image inspect inspector-test --format '{{.Id}}' > evidence/image-id.txt
+          docker save inspector-test | gzip -n > evidence/inspector.tar.gz
+          sha256sum evidence/inspector.tar.gz > evidence/archive.sha256
+          cp report.json evidence/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inspector-tested-candidate
+          path: evidence/
+          retention-days: 7
+      - name: Fail closed on host isolation gaps
+        run: python3 -c 'import json; r=json.load(open("evidence/host-security.json")); assert not r["signal_permission"] and not r["process_root_access"], r'
