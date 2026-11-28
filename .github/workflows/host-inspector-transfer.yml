@@ -1,0 +1,30 @@
+name: Inspector pinned transfer preflight
+on:
+  push:
+    paths:
+      - '.github/workflows/host-inspector-transfer.yml'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download exact artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh api repos/${{ github.repository }}/actions/artifacts/15254370061/zip > artifact.zip
+          echo 'b3a05b299b75126ed3a704b42d8694d6e407be200ede70e4b57d7edd006ab5c9  artifact.zip' | sha256sum -c -
+          unzip -q artifact.zip -d evidence
+          cd evidence
+          sha256sum -c archive.sha256
+          gzip -dc inspector.tar.gz | docker load
+          test "$(docker image inspect inspector-test --format '{{.Id}}')" = "$(cat image-id.txt)"
+          python3 -c 'import json; r=json.load(open("host-security.json")); assert not r["signal_permission"] and not r["process_root_access"]'
+          docker image inspect inspector-test --format '{{.Id}} {{.Architecture}}'
+      - name: Check publication prerequisites
+        run: |
+          echo 'Publication requires verified zero-cost eligibility and dedicated package access.'
+          echo 'No registry mutation performed.'
