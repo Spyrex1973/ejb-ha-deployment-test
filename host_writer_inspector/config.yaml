@@ -1,0 +1,12 @@
+name: EJB Host Writer Inspector
+version: "0.1.0"
+slug: host_writer_inspector
+description: Restricted diagnostic candidate; no production writes
+arch: [amd64, aarch64]
+startup: application
+boot: manual
+init: false
+host_pid: true
+map:
+  - type: media
+    read_only: true
