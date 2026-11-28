@@ -16,6 +16,13 @@ jobs:
       - run: |
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges inspector-test > report.json
           python3 -c 'import json; r=json.load(open("report.json")); assert r["uid"]==65534 and r["complete"] is False'
+      - name: Load and verify mandatory access control
+        run: |
+          set -eu
+          test "$(cat /sys/module/apparmor/parameters/enabled)" = Y
+          command -v apparmor_parser
+          sudo apparmor_parser -r host_writer_inspector/apparmor.txt
+          sudo grep -F 'host_writer_inspector (enforce)' /sys/kernel/security/apparmor/profiles
       - name: Host PID security characterization
         shell: bash
         run: |
@@ -24,8 +31,8 @@ jobs:
           docker run -d --name inspector-fixture --user 65534:65534 --entrypoint sleep inspector-test 120
           trap 'docker rm -f inspector-fixture >/dev/null' EXIT
           pid=$(docker inspect -f '{{.State.Pid}}' inspector-fixture)
-          docker run --rm --pid host --network none --read-only --cap-drop ALL --security-opt no-new-privileges inspector-test > evidence/host-report.json
-          docker run --rm --pid host --network none --read-only --cap-drop ALL --security-opt no-new-privileges --entrypoint python inspector-test -c 'import os,json,sys; p=int(sys.argv[1]); r={"fixture_pid":p}; 
+          docker run --rm --pid host --security-opt apparmor=host_writer_inspector --network none --read-only --cap-drop ALL --security-opt no-new-privileges inspector-test > evidence/host-report.json
+          docker run --rm --pid host --security-opt apparmor=host_writer_inspector --network none --read-only --cap-drop ALL --security-opt no-new-privileges --entrypoint python inspector-test -c 'import os,json,sys; p=int(sys.argv[1]); r={"fixture_pid":p}; 
           try: os.kill(p,0); r["signal_permission"]=True
           except PermissionError: r["signal_permission"]=False
           try: fd=os.open("/proc/%d/root"%p,os.O_PATH); os.close(fd); r["process_root_access"]=True
