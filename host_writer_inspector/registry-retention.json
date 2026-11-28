@@ -1,0 +1,11 @@
+{
+  "package": "ghcr.io/spyrex1973/ejb-host-writer-inspector",
+  "tag": "0.1.1-ci46122065139",
+  "digest": "sha256:4e6ab2619a744a2b8a92e048d40454dff545149ce2bff1aed142556ddd65135d",
+  "source_artifact": 15254370061,
+  "publication_run": 46122718076,
+  "evidence_artifact": 15254416201,
+  "retention_policy": "retain pinned version; do not delete or overwrite",
+  "enforcement": "not verified",
+  "visibility": "not verified"
+}
