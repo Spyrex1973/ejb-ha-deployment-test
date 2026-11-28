@@ -1,0 +1,19 @@
+name: Host inspector validation
+on:
+  push:
+    paths:
+      - 'host_writer_inspector/**'
+      - '.github/workflows/host-inspector-ci.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s host_writer_inspector -p test_inspector.py
+      - run: docker build -t inspector-test host_writer_inspector
+      - run: |
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges inspector-test > report.json
+          python3 -c 'import json; r=json.load(open("report.json")); assert r["uid"]==65534 and r["complete"] is False'
+          docker image inspect inspector-test --format '{{.Id}}'
