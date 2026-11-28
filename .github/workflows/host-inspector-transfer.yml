@@ -25,7 +25,27 @@ jobs:
           test "$(docker image inspect inspector-test --format '{{.Id}}')" = "$(cat image-id.txt)"
           python3 -c 'import json; r=json.load(open("host-security.json")); assert not r["signal_permission"] and not r["process_root_access"]'
           docker image inspect inspector-test --format '{{.Id}} {{.Architecture}}'
-      - name: Check publication prerequisites
+      - name: Publish only dedicated inspector candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo 'Publication requires verified zero-cost eligibility and dedicated package access.'
-          echo 'No registry mutation performed.'
+          set -eu
+          image=ghcr.io/spyrex1973/ejb-host-writer-inspector
+          tag="$image:0.1.1-ci46122065139"
+          expected=sha256:4e6ab2619a744a2b8a92e048d40454dff545149ce2bff1aed142556ddd65135d
+          test "$(docker image inspect inspector-test --format '{{.Id}}')" = "$expected"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag inspector-test "$tag"
+          docker push "$tag"
+          digest=$(docker image inspect "$tag" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -F "$image@" | head -n1)
+          test -n "$digest"
+          docker image rm "$tag" inspector-test
+          docker pull "$digest"
+          test "$(docker image inspect "$digest" --format '{{.Id}}')" = "$expected"
+          printf '%s\n' "$digest" "$expected" > registry-evidence.txt
+          docker logout ghcr.io
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inspector-registry-evidence
+          path: registry-evidence.txt
+          retention-days: 7
